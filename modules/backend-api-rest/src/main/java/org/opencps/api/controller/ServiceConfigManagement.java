@@ -18,6 +18,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.opencps.api.serviceconfig.model.ListServiceInputModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionInputModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionResultsModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionSearchModel;
@@ -179,4 +180,22 @@ public interface ServiceConfigManagement {
 			@ApiParam(value = "serviceconfigId for remove") @PathParam("id") long id,
 			@ApiParam(value = "processOptionId for remove") @PathParam("optionId") long optionId);
 
+	
+	@POST
+	@Path("/batexec")
+	@Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED })
+	@Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED })
+	@ApiOperation(value = "Add List Services", response = ListServiceInputModel.class)
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "Add List Service", response = ListServiceInputModel.class),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized", response = ExceptionModel.class),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Not found", response = ExceptionModel.class),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "Access denied", response = ExceptionModel.class)
+	})
+	public Response addListService(@Context HttpServletRequest request, @Context HttpHeaders header,
+			@Context Company company, @Context Locale locale, @Context User user,
+			@Context ServiceContext serviceContext,
+			@ApiParam(value = "body params for post") @BeanParam ListServiceInputModel input);
+	
 }
+

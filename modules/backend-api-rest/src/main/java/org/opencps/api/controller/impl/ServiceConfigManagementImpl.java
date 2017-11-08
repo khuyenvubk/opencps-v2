@@ -1,5 +1,6 @@
 package org.opencps.api.controller.impl;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -10,9 +11,12 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.httpclient.util.HttpURLConnection;
+import org.apache.cxf.service.model.ServiceInfo;
+import org.omg.PortableInterceptor.ServerRequestInterceptorOperations;
 import org.opencps.api.controller.ServiceConfigManagement;
 import org.opencps.api.controller.exception.ErrorMsg;
 import org.opencps.api.controller.util.ServiceConfigUtils;
+import org.opencps.api.serviceconfig.model.ListServiceInputModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionInputModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionResultsModel;
 import org.opencps.api.serviceconfig.model.ProcessOptionSearchModel;
@@ -27,11 +31,19 @@ import org.opencps.auth.api.exception.UnauthenticationException;
 import org.opencps.auth.api.exception.UnauthorizationException;
 import org.opencps.auth.api.keys.ActionKeys;
 import org.opencps.dossiermgt.action.ServiceConfigActions;
+import org.opencps.dossiermgt.action.ServiceInfoActions;
 import org.opencps.dossiermgt.action.impl.ServiceConfigActionImpl;
+import org.opencps.dossiermgt.action.impl.ServiceInfoActionsImpl;
 import org.opencps.dossiermgt.constants.ProcessOptionTerm;
 import org.opencps.dossiermgt.constants.ServiceConfigTerm;
+import org.opencps.dossiermgt.model.DossierTemplate;
 import org.opencps.dossiermgt.model.ProcessOption;
 import org.opencps.dossiermgt.model.ServiceConfig;
+import org.opencps.dossiermgt.service.DossierActionLocalServiceUtil;
+import org.opencps.dossiermgt.service.DossierTemplateLocalServiceUtil;
+import org.opencps.dossiermgt.service.ProcessOptionLocalService;
+import org.opencps.dossiermgt.service.ProcessOptionLocalServiceUtil;
+import org.opencps.dossiermgt.service.ServiceProcessLocalServiceUtil;
 
 import com.liferay.portal.kernel.json.JSONObject;
 import com.liferay.portal.kernel.model.Company;
@@ -83,8 +95,6 @@ public class ServiceConfigManagementImpl implements ServiceConfigManagement {
 
 			Sort[] sorts = new Sort[] { SortFactoryUtil.create(query.getSort() + "_sortable", Sort.STRING_TYPE,
 					GetterUtil.getBoolean(query.getOrder())) };
-			
-			
 
 			JSONObject jsonData = actions.getServiceConfigs(serviceContext.getUserId(), serviceContext.getCompanyId(),
 					groupId, params, sorts, query.getStart(), query.getEnd(), serviceContext);
@@ -397,9 +407,9 @@ public class ServiceConfigManagementImpl implements ServiceConfigManagement {
 				throw new UnauthorizationException();
 			}
 
-			ProcessOption serviceConfig = actions.updateOption(groupId,input.getOptionName(), 0l, id, input.getSeqOrder(),
-					input.getAutoSelect(), input.getInstructionNote(), input.getSubmissionNote(), input.getDossierTemplateId(),
-					input.getServiceProcessId(), serviceContext);
+			ProcessOption serviceConfig = actions.updateOption(groupId, input.getOptionName(), 0l, id,
+					input.getSeqOrder(), input.getAutoSelect(), input.getInstructionNote(), input.getSubmissionNote(),
+					input.getDossierTemplateId(), input.getServiceProcessId(), serviceContext);
 
 			returnModel = ServiceConfigUtils.mappingToProcessOption(serviceConfig);
 
@@ -455,9 +465,9 @@ public class ServiceConfigManagementImpl implements ServiceConfigManagement {
 				throw new UnauthorizationException();
 			}
 
-			ProcessOption processOption = actions.updateOption(groupId, input.getOptionName(), optionId, id, input.getSeqOrder(),
-					input.getAutoSelect(), input.getInstructionNote(), input.getSubmissionNote(), input.getDossierTemplateId(),
-					input.getServiceProcessId(), serviceContext);
+			ProcessOption processOption = actions.updateOption(groupId, input.getOptionName(), optionId, id,
+					input.getSeqOrder(), input.getAutoSelect(), input.getInstructionNote(), input.getSubmissionNote(),
+					input.getDossierTemplateId(), input.getServiceProcessId(), serviceContext);
 
 			returnModel = ServiceConfigUtils.mappingToProcessOption(processOption);
 
@@ -497,7 +507,7 @@ public class ServiceConfigManagementImpl implements ServiceConfigManagement {
 	@Override
 	public Response removeProcessOption(HttpServletRequest request, HttpHeaders header, Company company, Locale locale,
 			User user, ServiceContext serviceContext, long id, long optionId) {
-		
+
 		ServiceConfigActions actions = new ServiceConfigActionImpl();
 
 		org.opencps.api.serviceconfig.model.ProcessOption returnModel = new org.opencps.api.serviceconfig.model.ProcessOption();
@@ -547,6 +557,78 @@ public class ServiceConfigManagementImpl implements ServiceConfigManagement {
 				}
 			}
 		}
+	}
+
+	@Override
+	public Response addListService(HttpServletRequest request, HttpHeaders header, Company company, Locale locale,
+			User user, ServiceContext serviceContext, ListServiceInputModel input) {
+		ServiceConfigActions actions = new ServiceConfigActionImpl();
+		long groupId = GetterUtil.getLong(header.getHeaderString("groupId"));
+		long userId = serviceContext.getUserId();
+		List<ServiceConfig> listServiceConfig = new ArrayList<>();
+        
+		
+		org.opencps.api.serviceconfig.model.ProcessOption returnModel = new org.opencps.api.serviceconfig.model.ProcessOption();
+
+		BackendAuth auth = new BackendAuthImpl();
+
+		try {
+			if (!auth.isAuth(serviceContext)) {
+				throw new UnauthenticationException();
+			}
+
+			if (!auth.hasResource(serviceContext, ServiceConfig.class.getName(), ActionKeys.ADD_ENTRY)) {
+				throw new UnauthorizationException();
+			}
+
+			List<String> listAgencies = new ArrayList<String>();
+			listAgencies = input.getAgencies();
+			for (int i = 0; i < listAgencies.size(); i++) {
+
+				ServiceConfig serviceConfig = actions.updateServiceConfig(0, userId, groupId,
+						(long) input.getServiceInfoId(), listAgencies.get(i), input.getServiceInstruction(),
+						input.getServiceLevel(), (input.getServiceUrl()), GetterUtil.getBoolean(input.getForCitizen()),
+						GetterUtil.getBoolean(input.getForBusiness()), GetterUtil.getBoolean(input.getPostalService()),
+						GetterUtil.getBoolean(input.getRegistration()), serviceContext);
+
+				ProcessOption processOption = ProcessOptionLocalServiceUtil.updateProcessOption(0, input.getOptionName(),  0, serviceConfig.getServiceConfigId(), 0, "",
+						input.getInstructionNote(), input.getSubmissionNote(), input.getDossierTemplateId(), input.getServiceProcessId(), serviceContext);
+				
+				returnModel = ServiceConfigUtils.mappingToProcessOption(processOption);
+				
+			}
+
+			return Response.status(200).entity(returnModel).build();
+
+		} catch (Exception e) {
+			ErrorMsg error = new ErrorMsg();
+
+			if (e instanceof UnauthenticationException) {
+				error.setMessage("Non-Authoritative Information.");
+				error.setCode(HttpURLConnection.HTTP_NOT_AUTHORITATIVE);
+				error.setDescription("Non-Authoritative Information.");
+
+				return Response.status(HttpURLConnection.HTTP_NOT_AUTHORITATIVE).entity(error).build();
+			} else {
+				if (e instanceof UnauthorizationException) {
+					error.setMessage("Unauthorized.");
+					error.setCode(HttpURLConnection.HTTP_NOT_AUTHORITATIVE);
+					error.setDescription("Unauthorized.");
+
+					return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).entity(error).build();
+
+				} else {
+
+					error.setMessage("Internal Server Error");
+					error.setCode(HttpURLConnection.HTTP_FORBIDDEN);
+					error.setDescription(e.getMessage());
+
+					return Response.status(HttpURLConnection.HTTP_INTERNAL_ERROR).entity(error).build();
+
+				}
+			}
+		}
+		
 	}
 
 }
